@@ -4,7 +4,7 @@ import prisma from '../database/prisma/prisma'
 import { formatterDate, getDateNow } from '../utils/date'
 import { comparePassword, hashingPassword } from '../utils/hash'
 import { AddUser, Users, UserToken } from '../database/models/Users'
-import { generateAccessToken, generateRefreshToken } from '../utils/token'
+import { generateAccessToken, generateRefreshToken, verifyRefreshToken } from '../utils/token'
 
 export const addUser = async (req: Request, res: Response): Promise<Response> => {
     const { ...body } = req.body
@@ -324,6 +324,69 @@ export const userSignUp = async (req: Request, res: Response): Promise<Response>
             data: data
         })
     } catch (err: any) {
+        return res.status(500).json({
+            status: 500,
+            message: 'An error occurred while loading the data. Please try again later'
+        })
+    }
+}
+
+export const getRefreshToken = async (req: Request, res: Response): Promise<Response> => {
+    const refreshToken: string | null = req.cookies?.xyzbcrt ?? null
+
+    try {
+
+        if (refreshToken === null) {
+            return res.status(401).json({
+                status: 401,
+                message: 'Unauthorized'
+            })
+        }
+
+        const verify: UserToken | null = verifyRefreshToken(refreshToken)
+
+        if (verify === null) {
+            return res.status(401).json({
+                status: 401,
+                message: 'Unauthorized'
+            })
+        }
+
+        const user: Users | null = await prisma.users.findUnique({ where: { id: Number(verify.id) } })
+
+        if (user === null) {
+            return res.status(401).json({
+                status: 401,
+                message: 'Unauthorized'
+            })
+        }
+
+        const compareRefreshToken: boolean = (refreshToken === user.refreshToken)
+
+        if (!compareRefreshToken) {
+            return res.status(401).json({
+                status: 401,
+                message: 'Unauthorized'
+            })
+        }
+
+        const accessToken: UserToken = { ...verify }
+
+        const newAccessToken: string = generateAccessToken(accessToken)
+
+        await prisma.users.update({ where: { id: Number(verify.id) }, data: { accessToken: newAccessToken } })
+
+        res.cookie('xyzbcat', accessToken, {
+            maxAge: 12 * 60 * 60 * 1000, // for 12 hours
+            httpOnly: true,
+        })
+
+        return res.status(200).json({
+            status: 200,
+            message: 'OK',
+            data: { accessToken: newAccessToken }
+        })
+    } catch (error) {
         return res.status(500).json({
             status: 500,
             message: 'An error occurred while loading the data. Please try again later'

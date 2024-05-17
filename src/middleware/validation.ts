@@ -1,8 +1,8 @@
 import { ZodError } from 'zod'
 import { type Request, type Response, type NextFunction } from 'express'
 
-import { roleSchema, updateUserDataSchema, userSchema } from '../schema/object.schemas'
 import handleZodError from '../utils/zodError'
+import { roleSchema, updateUserDataSchema, userSchema } from '../schema/object.schemas'
 
 export const addRoleValidation = async (req: Request, res: Response, next: NextFunction): Promise<any> => {
     const { name } = req.body
